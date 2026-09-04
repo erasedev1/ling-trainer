@@ -5,25 +5,7 @@ import { MODES, type ModeId } from '../../engine/modes/session';
 import { randomSeed } from '../../engine/shake/rng';
 import { breakdowns, weaknesses } from '../../engine/stats/stats';
 import type { PartOfSpeech } from '../../engine/types';
-import type { Weakness } from '../../engine/stats/stats';
-
-/**
- * Route a weakness to the drill that can actually fix it: a word-level weakness
- * goes to a focused gauntlet, a sentence-level one to the judgement bank filtered
- * to that topic.
- */
-export function drillFor(weakness: Weakness): [string, Record<string, string | number>] {
-  if (weakness.kind === 'topic') return ['/judgement', { topic: weakness.key }];
-  return [
-    '/drill',
-    {
-      mode: 'category-gauntlet',
-      seed: randomSeed(),
-      seconds: 90,
-      ...(weakness.kind === 'type' ? { type: weakness.key } : { demand: weakness.key }),
-    },
-  ];
-}
+import { drillFor } from '../weakness';
 
 const ORDER: ModeId[] = [
   'shake-sprint',

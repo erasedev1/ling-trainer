@@ -19,9 +19,8 @@ export interface Settings {
   /** Cube set id, or 'custom'. */
   cubeSetId: string;
   customCubeSet?: CubeSet;
-  soundCues: boolean;
+  /** How many missed words a results screen lists before it truncates. */
   showAnswerKeyLimit: number;
-  reduceMotion: boolean;
 }
 
 export interface StoredData {
@@ -36,9 +35,7 @@ export interface StoredData {
 
 export const DEFAULT_SETTINGS: Settings = {
   cubeSetId: 'approximate-2026',
-  soundCues: false,
   showAnswerKeyLimit: 40,
-  reduceMotion: false,
 };
 
 const KEY = 'ling-trainer:v1';

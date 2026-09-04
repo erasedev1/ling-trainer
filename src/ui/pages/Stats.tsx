@@ -6,7 +6,7 @@ import { breakdowns, totals, weaknesses, type Bucket } from '../../engine/stats/
 import { RECORD_DEFS } from '../../engine/stats/records';
 import { MODES } from '../../engine/modes/session';
 import { randomSeed } from '../../engine/shake/rng';
-import { drillFor } from './Home';
+import { drillFor } from '../weakness';
 import { TRAINING_SCORE_LABEL } from '../../engine/scoring/score';
 
 export function Stats() {
