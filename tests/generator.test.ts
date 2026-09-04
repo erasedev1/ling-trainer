@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateAtLevel, generateScenario } from '../src/engine/generator/scenario';
-import { gradeSubmission, solveShake } from '../src/engine/demands/solve';
+import { gradeSubmission } from '../src/engine/demands/solve';
 import { stackViolations } from '../src/engine/demands/legality';
 import { createRng } from '../src/engine/shake/rng';
 import { cubeSet, lexicon, ruleset } from './helpers';

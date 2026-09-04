@@ -214,7 +214,7 @@ export function submit(state: SessionState, raw: string, deps: SessionDeps): Ses
   return { ...state, submissions: [...state.submissions, result], seen };
 }
 
-export function tick(state: SessionState, deltaMs: number, deps: SessionDeps): SessionState {
+export function tick(state: SessionState, deltaMs: number): SessionState {
   if (state.status !== 'running') return state;
   const spec = MODES[state.config.mode];
   const remainingMs = state.remainingMs - deltaMs;

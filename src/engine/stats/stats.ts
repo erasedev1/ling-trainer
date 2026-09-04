@@ -86,6 +86,19 @@ export function toSessionLog(state: SessionState): SessionLog {
   };
 }
 
+/**
+ * One answered judgement item. These carry the sentence-level topics — clause
+ * function, phrase function, retained objects — that the shake drills cannot
+ * measure, so the dashboard needs both logs to answer "what should I practise?".
+ */
+export interface JudgementLog {
+  at: number;
+  itemId: string;
+  kind: 'analysis' | 'validation' | 'rule';
+  topics: string[];
+  correct: boolean;
+}
+
 export interface Bucket {
   key: string;
   label: string;
@@ -145,10 +158,67 @@ export interface Breakdowns {
   byDemand: Bucket[];
   byDesignation: Bucket[];
   byLevel: Bucket[];
+  byTopic: Bucket[];
 }
 
-export function breakdowns(logs: ShakeLog[], demandLabel: (id: string) => string): Breakdowns {
+/** Human label for a judgement topic key such as `phrase.gerund`. */
+export function topicLabel(key: string): string {
+  const [head, ...rest] = key.split(/[.:]/);
+  const tail = rest.join(' ').replace(/-/g, ' ');
+  switch (head) {
+    case 'clause':
+      return `${tail} clause`;
+    case 'phrase':
+      return `${tail} phrase`;
+    case 'function':
+      return `${tail} (function)`;
+    case 'pattern':
+      return `pattern ${tail}`;
+    case 'structure':
+      return `${tail} structure`;
+    case 'purpose':
+      return `${tail} purpose`;
+    case 'type':
+      return `${tail} (type demand)`;
+    case 'quote':
+      return `${tail} quote`;
+    case 'rule':
+      return `rule: ${tail}`;
+    case 'word':
+    case 'sentence':
+      return `${head} — ${tail}`;
+    default:
+      return key.replace(/[.:]/g, ' ');
+  }
+}
+
+/**
+ * Judgement items graded per topic. Coverage and accuracy are the same number
+ * here (an item is right or wrong), which keeps them comparable with the shake
+ * buckets when weaknesses are ranked.
+ */
+export function topicBreakdown(logs: JudgementLog[]): Bucket[] {
+  const buckets = new Map<string, Bucket>();
+  for (const log of logs) {
+    for (const topic of log.topics) {
+      const bucket = buckets.get(topic) ?? emptyBucket(topic, topicLabel(topic));
+      bucket.shakes += 1;
+      bucket.answerCount += 1;
+      bucket.valid += log.correct ? 1 : 0;
+      bucket.invalid += log.correct ? 0 : 1;
+      buckets.set(topic, bucket);
+    }
+  }
+  return [...buckets.values()].map((b) => finalise(b, { sum: 0, n: 0 }));
+}
+
+export function breakdowns(
+  logs: ShakeLog[],
+  demandLabel: (id: string) => string,
+  judgement: JudgementLog[] = [],
+): Breakdowns {
   return {
+    byTopic: topicBreakdown(judgement),
     byType: group(logs, (l) => [l.type], (k) => k),
     byDemand: group(
       logs,
@@ -168,7 +238,7 @@ export interface Weakness {
   /** 0..1 — lower is worse. */
   strength: number;
   shakes: number;
-  kind: 'type' | 'demand' | 'designation';
+  kind: 'type' | 'demand' | 'designation' | 'topic';
 }
 
 /**
@@ -176,14 +246,21 @@ export interface Weakness {
  *
  * Strength blends coverage (did you find what was there?) with accuracy (were
  * your guesses clean?), because either failure mode loses a shake in real play.
- * Buckets with too little data are ignored rather than guessed at.
+ * Buckets with too little data are ignored rather than guessed at, and a bucket
+ * the player is already good at is never reported — an empty result means
+ * "nothing is clearly weak yet", not "everything is bad".
  */
-export function weaknesses(breaks: Breakdowns, minShakes = 4): Weakness[] {
+export function weaknesses(
+  breaks: Breakdowns,
+  { minShakes = 4, maxStrength = 0.8 }: { minShakes?: number; maxStrength?: number } = {},
+): Weakness[] {
   const out: Weakness[] = [];
   const consider = (buckets: Bucket[], kind: Weakness['kind']) => {
     for (const bucket of buckets) {
       if (bucket.shakes < minShakes) continue;
-      const strength = bucket.coverage * 0.6 + bucket.accuracy * 0.4;
+      const strength = kind === 'topic' ? bucket.accuracy : bucket.coverage * 0.6 + bucket.accuracy * 0.4;
+      // A bucket the player is good at is not a weakness, however it ranks.
+      if (strength > maxStrength) continue;
       out.push({
         key: bucket.key,
         label: bucket.label,
@@ -191,15 +268,18 @@ export function weaknesses(breaks: Breakdowns, minShakes = 4): Weakness[] {
         strength,
         shakes: bucket.shakes,
         message:
-          bucket.accuracy < 0.7
-            ? `${Math.round(bucket.accuracy * 100)}% of your submissions here are legal — you are guessing.`
-            : `You find ${Math.round(bucket.coverage * 100)}% of the available words here.`,
+          kind === 'topic'
+            ? `You answer ${Math.round(bucket.accuracy * 100)}% of these judgement items correctly.`
+            : bucket.accuracy < 0.7
+              ? `${Math.round(bucket.accuracy * 100)}% of your submissions here are legal — you are guessing.`
+              : `You find ${Math.round(bucket.coverage * 100)}% of the available words here.`,
       });
     }
   };
   consider(breaks.byType, 'type');
   consider(breaks.byDemand, 'demand');
   consider(breaks.byDesignation, 'designation');
+  consider(breaks.byTopic, 'topic');
   return out.sort((a, b) => a.strength - b.strength);
 }
 
