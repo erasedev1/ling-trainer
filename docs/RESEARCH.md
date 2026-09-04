@@ -328,6 +328,14 @@ redistributable and has no public API, so the trainer ships an approximation:
 Rules that follow from LT 22 and are enforced by the engine: lowercase a–z only (no
 proper nouns, contractions, hyphens, apostrophes, diacritics), 4–10 letters.
 
+The closed-class lists are transcribed from the Handbook, but the Handbook itself says its
+subordinating-conjunction and conjunctive-adverb lists are "not all-inclusive", its
+preposition list is of "commonly used" prepositions, and its pronoun chart "is not intended
+to be a comprehensive list"; interjections are decided case by case by the dictionary. The
+trainer grades against those lists and **says so on screen** whenever the Type Demand is one
+of those four classes, so a rejection reads as a prompt to look the word up rather than as a
+ruling.
+
 A submitted word that is a real spelling but carries no tags is reported **UNVERIFIED** —
 it is neither counted valid nor counted against accuracy, and the UI says why. That is
 deliberate: wrongly rejecting a word a player legitimately found is worse for training

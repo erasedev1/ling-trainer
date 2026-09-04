@@ -26,6 +26,25 @@ import type { PartOfSpeech } from '../../engine/types';
 
 const TICK_MS = 100;
 
+/**
+ * Where the trainer's word list is knowingly incomplete.
+ *
+ * The Handbook's own lists for these classes say they are not all-inclusive, and
+ * interjections are decided case by case by the dictionary ("lists the word as an
+ * interjection or as 'used interjectionally'", LT 10 note). The drill still
+ * grades against them, but it says so.
+ */
+const CLOSED_CLASS_NOTE: Partial<Record<PartOfSpeech, string>> = {
+  preposition:
+    'Prepositions are graded against the Handbook\u2019s "Commonly Used Prepositions" list, which is not exhaustive.',
+  conjunction:
+    'Conjunctions are graded against the Handbook\u2019s subordinating-conjunction and conjunctive-adverb lists, which it states are not all-inclusive.',
+  interjection:
+    'Interjections are graded against a curated list. In play, any word the official dictionary lists as an interjection \u2014 or as "used interjectionally" \u2014 is legal.',
+  pronoun:
+    'Pronouns are graded against the Handbook\u2019s pronoun charts, which note they are not a comprehensive list.',
+};
+
 export function Drill({ route }: { route: Route }) {
   const app = useApp();
   const mode = (route.params.get('mode') ?? 'shake-sprint') as ModeId;
@@ -255,6 +274,14 @@ function ShakeResult({
               <span className="dim">— {submission.reason}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {CLOSED_CLASS_NOTE[scenario.type] && (
+        <div className="notice">
+          {CLOSED_CLASS_NOTE[scenario.type]} The official dictionary is the final authority on whether a word may be
+          used as the demanded part of speech (LT 22 G), so treat a rejection here as a prompt to look the word up
+          rather than a ruling.
         </div>
       )}
 
