@@ -28,23 +28,23 @@ data lives in the browser's local storage.
 ## Deploying to GitHub Pages
 
 `.github/workflows/pages.yml` builds the site and publishes `dist/` on every push to the
-default branch. It also sets the Pages build source to **GitHub Actions** itself, so there is
-normally nothing to configure.
-
-If Pages is left on "Deploy from a branch" it serves the repository *source*: the browser is
-handed `index.html`'s `<script src="/src/main.tsx">`, which it cannot execute, and the page
-renders **blank**. Worse, GitHub's own "pages build and deployment" workflow then runs on
-every push and republishes that source seconds *after* this workflow deploys the real build,
-overwriting it. A blank page with a green checkmark on the deploy is that race.
-
-Should the workflow ever be denied the `pages: write` permission (an organisation policy can
-withhold it), the step is skipped rather than failing the build, and the setting has to be
-changed by hand:
+default branch. **One repository setting has to be changed by hand, once:**
 
 > **Settings → Pages → Build and deployment → Source: _GitHub Actions_**
 
-To go back to branch deploys, delete the `source` job from the workflow first — otherwise it
-switches the setting back on the next push.
+This cannot be automated. GitHub blocks the Pages settings API for a workflow's
+`GITHUB_TOKEN`: `PUT /repos/{owner}/{repo}/pages` answers `403 Resource not accessible by
+integration` even when the job is granted `pages: write`.
+
+Until that setting is changed, Pages stays in branch ("legacy") mode and GitHub's own
+*"pages build and deployment"* workflow runs on every push, publishing the repository
+*source*. The browser is handed `index.html`'s `<script src="/src/main.tsx">`, cannot execute
+TypeScript, and renders a **blank page**. Both workflows write to the same site, so whichever
+finishes last wins and the site flickers between the real build and a blank page — a blank
+page next to a green checkmark on the deploy is exactly that race.
+
+The `check` job in the workflow reports the current build source and writes a warning into
+the run summary when it is wrong, so this can never look like success again.
 
 The site is built with a relative base (`base: './'` in `vite.config.ts`) and uses hash
 routing, so it works from a project subpath such as `https://<user>.github.io/ling-trainer/`

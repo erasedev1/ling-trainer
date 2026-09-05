@@ -4,15 +4,18 @@
 # repo points at /src/main.tsx, which a browser cannot execute. This workflow
 # builds with Vite and publishes dist/.
 #
-# It also switches the Pages build source to "GitHub Actions" itself (the
-# `source` job below). While Pages is set to "Deploy from a branch", GitHub runs
-# its own "pages build and deployment" workflow on every push, which republishes
-# the raw source and overwrites this deployment moments after it lands — the two
-# race, and the branch build usually wins.
+# IT CANNOT SET THE PAGES SOURCE FOR YOU. GitHub blocks the Pages settings API
+# for a workflow's GITHUB_TOKEN — `PUT /repos/{owner}/{repo}/pages` answers 403
+# "Resource not accessible by integration" even with `pages: write` granted. A
+# human has to make this one change, once:
 #
-# To go back to branch deploys: Settings → Pages → Build and deployment →
-# Source → "Deploy from a branch". Delete the `source` job first, or it will
-# switch back on the next push.
+#     Settings -> Pages -> Build and deployment -> Source -> "GitHub Actions"
+#
+# Until then Pages stays in "legacy" (branch) mode, GitHub's own "pages build
+# and deployment" workflow runs on every push, and it republishes the raw source
+# over the top of this deployment. Whichever finishes last wins, so the site
+# flickers between a working build and a blank page. The `check` job below says
+# so loudly rather than letting that look like success.
 name: Deploy to GitHub Pages
 
 on:
@@ -27,36 +30,43 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Make Pages serve this workflow's artifact rather than the branch. Runs before
-  # the build so the branch-built deployment is not still racing this one.
-  source:
+  # Report the Pages build source. This job cannot change it (see the header):
+  # its only job is to make a misconfiguration visible instead of silent.
+  check:
     if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     permissions:
-      pages: write
+      pages: read
     steps:
-      - name: Set the Pages build source to GitHub Actions
+      - name: Check that Pages is set to deploy from GitHub Actions
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Already correct, or already ours: nothing to do.
-          current=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .build_type 2>/dev/null || echo none)
-          echo "current build source: $current"
-          if [ "$current" = "workflow" ]; then exit 0; fi
-          if [ "$current" = "none" ]; then
-            gh api -X POST "repos/$GITHUB_REPOSITORY/pages" -f build_type=workflow
-          else
-            gh api -X PUT "repos/$GITHUB_REPOSITORY/pages" -f build_type=workflow
+          current=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .build_type 2>/dev/null || echo unknown)
+          echo "Pages build source: $current"
+          if [ "$current" = "workflow" ]; then
+            echo "Pages is deploying from GitHub Actions. This workflow's build is what visitors get." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
-          echo "switched to: $(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .build_type)"
-        # A repository or organisation policy can withhold this permission. That
-        # is not a build failure — the deploy below still runs, and the README
-        # explains the one setting to change by hand.
-        continue-on-error: true
+          {
+            echo "## :warning: GitHub Pages is not serving this build"
+            echo
+            echo "Pages build source is \`$current\`, not \`workflow\`."
+            echo
+            echo "While it stays that way, GitHub's built-in \"pages build and deployment\""
+            echo "publishes the repository **source** on every push. The browser is handed"
+            echo "\`index.html\`'s \`<script src=\"/src/main.tsx\">\`, cannot execute TypeScript,"
+            echo "and renders a **blank page**."
+            echo
+            echo "Fix it once, by hand — a workflow token is refused this API (403):"
+            echo
+            echo "> **Settings -> Pages -> Build and deployment -> Source -> \"GitHub Actions\"**"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::warning title=Pages is serving the repo source::Set Settings > Pages > Build and deployment > Source to 'GitHub Actions'. Until then the site renders blank."
 
   build:
-    needs: source
-    # `source` is skipped on non-default branches; still build and test there.
+    needs: check
+    # `check` is skipped on non-default branches, and never blocks a deploy.
     if: always()
     runs-on: ubuntu-latest
     steps:
