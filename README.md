@@ -25,6 +25,21 @@ npm run build       # static site in dist/ — host it anywhere
 The build is entirely static: no server, no accounts, no network at runtime. All training
 data lives in the browser's local storage.
 
+## Deploying to GitHub Pages
+
+`.github/workflows/pages.yml` builds the site and publishes `dist/` on every push to the
+default branch. It needs one setting flipped once, in the repository:
+
+> **Settings → Pages → Build and deployment → Source: _GitHub Actions_**
+
+If Pages is set to "Deploy from a branch" it serves the repository *source*, and the browser
+is handed `index.html`'s `<script src="/src/main.tsx">` — TypeScript it cannot execute, so the
+page renders **blank**. That is the symptom to look for.
+
+The site is built with a relative base (`base: './'` in `vite.config.ts`) and uses hash
+routing, so it works from a project subpath such as `https://<user>.github.io/ling-trainer/`
+with no extra configuration, and deep links like `#/drill?mode=max-out` survive a refresh.
+
 ## What it trains
 
 | Mode | What it is for |
