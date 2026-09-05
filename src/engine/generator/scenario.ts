@@ -52,8 +52,14 @@ export interface GeneratorOptions {
   lexicon: Lexicon;
   /** 1..5; the generator tunes constraints and letters to hit this. */
   targetLevel?: number;
-  /** Restrict the Type Demand, for Category Gauntlet. */
+  /** Restrict the Type Demand to exactly this part of speech. */
   type?: PartOfSpeech;
+  /**
+   * Restrict the Type Demand to a chosen set — "nouns and verbs only". One is
+   * drawn per shake, by the same weighting as the unrestricted pool. Empty or
+   * omitted means every part of speech is fair game.
+   */
+  types?: PartOfSpeech[];
   /** Require a specific general demand to be in force, for focused drilling. */
   requireDemandId?: string;
   /** Never generate a shake with fewer answers than this. */
@@ -76,14 +82,16 @@ const TYPE_WEIGHTS: [PartOfSpeech, number][] = [
 /** Closed classes have tiny answer sets by nature; they get more letters, fewer demands. */
 const CLOSED_CLASS: PartOfSpeech[] = ['pronoun', 'preposition', 'conjunction', 'interjection'];
 
-function weightedType(rng: Rng): PartOfSpeech {
-  const total = TYPE_WEIGHTS.reduce((s, [, w]) => s + w, 0);
+function weightedType(rng: Rng, allowed?: PartOfSpeech[]): PartOfSpeech {
+  const pool = allowed?.length ? TYPE_WEIGHTS.filter(([type]) => allowed.includes(type)) : TYPE_WEIGHTS;
+  if (!pool.length) return 'noun';
+  const total = pool.reduce((s, [, w]) => s + w, 0);
   let roll = rng() * total;
-  for (const [type, weight] of TYPE_WEIGHTS) {
+  for (const [type, weight] of pool) {
     roll -= weight;
     if (roll <= 0) return type;
   }
-  return 'noun';
+  return pool[pool.length - 1][0];
 }
 
 export function rollCubes(cubeSet: CubeSet, rng: Rng): RolledCube[] {
@@ -223,7 +231,7 @@ export function generateScenario(opts: GeneratorOptions): Scenario {
   const { ruleset, cubeSet, lexicon } = opts;
   const rng = createRng(opts.seed);
   const targetLevel = opts.targetLevel ?? 3;
-  const type = opts.type ?? weightedType(rng);
+  const type = opts.type ?? weightedType(rng, opts.types);
   const closed = CLOSED_CLASS.includes(type);
   const minAnswers = opts.minAnswers ?? (closed ? 1 : targetLevel >= 4 ? 3 : 6);
 
@@ -405,7 +413,8 @@ export function generateAtLevel(opts: GeneratorOptions & { attempts?: number }):
     if (best.difficulty.level === target) break;
   }
   if (best) return best;
-  // Nothing at the requested level was solvable: fall back to an open noun shake,
-  // which the letter-growth step above can always satisfy.
-  return generateScenario({ ...opts, type: opts.type ?? 'noun', targetLevel: 1, minAnswers: 1 });
+  // Nothing at the requested level was solvable. Fall back to the gentlest shake
+  // the player's chosen parts of speech allow — never a part of speech they
+  // deselected, even if that means an easier shake than they asked for.
+  return generateScenario({ ...opts, targetLevel: 1, minAnswers: 1 });
 }

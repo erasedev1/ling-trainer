@@ -2,16 +2,12 @@ import { AppProvider, useApp } from './app-state';
 import { navigate, useRoute, type Route } from './router';
 import { Home } from './pages/Home';
 import { Drill } from './pages/Drill';
-import { Judgement } from './pages/Judgement';
 import { Stats } from './pages/Stats';
-import { Rules } from './pages/Rules';
 import { Settings } from './pages/Settings';
 
 const NAV = [
   { path: '/', label: 'Modes' },
-  { path: '/judgement', label: 'Judgement' },
   { path: '/stats', label: 'Statistics' },
-  { path: '/rules', label: 'Rules' },
   { path: '/settings', label: 'Settings' },
 ];
 
@@ -79,12 +75,8 @@ function Page({ route }: { route: Route }) {
   switch (route.path) {
     case '/drill':
       return <Drill route={route} />;
-    case '/judgement':
-      return <Judgement route={route} />;
     case '/stats':
       return <Stats />;
-    case '/rules':
-      return <Rules />;
     case '/settings':
       return <Settings />;
     default:

@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useApp } from '../app-state';
 import { navigate } from '../router';
-import { MODES, type ModeId } from '../../engine/modes/session';
+import { CUBE_POOLS, MODES, defaultConfig, type ModeId, type SessionConfig } from '../../engine/modes/session';
 import { randomSeed } from '../../engine/shake/rng';
 import { breakdowns, weaknesses } from '../../engine/stats/stats';
-import type { PartOfSpeech } from '../../engine/types';
 import { drillFor } from '../weakness';
+import type { PartOfSpeech } from '../../engine/types';
 
 const ORDER: ModeId[] = [
   'shake-sprint',
@@ -17,15 +17,22 @@ const ORDER: ModeId[] = [
   'simulation',
 ];
 
+const SECONDS = [10, 15, 20, 30, 45, 60, 90, 120];
+const WORDS = [1, 2, 3, 5, 10];
+
+const DEMAND_PRESSURE: { level: number; label: string }[] = [
+  { level: 1, label: 'None' },
+  { level: 2, label: 'Light' },
+  { level: 3, label: 'Standard' },
+  { level: 4, label: 'Heavy' },
+  { level: 5, label: 'Brutal' },
+];
+
 export function Home() {
   const app = useApp();
-  const [open, setOpen] = useState<ModeId | null>(null);
+  const [open, setOpen] = useState<ModeId | null>('shake-sprint');
 
-  const breaks = breakdowns(
-    app.data.shakes,
-    (id) => app.ruleset.generalDemands.find((d) => d.id === id)?.label ?? id,
-    app.data.judgement,
-  );
+  const breaks = breakdowns(app.data.shakes, (id) => app.ruleset.generalDemands.find((d) => d.id === id)?.label ?? id);
   const weakest = weaknesses(breaks)[0];
 
   return (
@@ -37,189 +44,261 @@ export function Home() {
         </div>
         <button
           className="btn btn-primary btn-lg"
-          onClick={() => navigate('/drill', { mode: 'shake-sprint', seed: randomSeed() })}
+          onClick={() => navigate('/drill', { ...toParams(defaultConfig('shake-sprint', randomSeed())) })}
         >
-          Shake Sprint · 15s
+          Quick Sprint · 15s
         </button>
       </div>
 
       {weakest && (
         <div className="notice" style={{ margin: '14px 0' }}>
           Your weakest area is <b style={{ color: 'var(--ink)' }}>{weakest.label}</b> — {weakest.message}{' '}
-          <button
-            className="btn btn-sm"
-            style={{ marginLeft: 8 }}
-            onClick={() => navigate(...drillFor(weakest))}
-          >
+          <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => navigate(...drillFor(weakest))}>
             Drill it
           </button>
         </div>
       )}
 
-      <div className="grid grid-2" style={{ marginTop: 18 }}>
+      <div className="modelist" style={{ marginTop: 18 }}>
         {ORDER.map((id) => {
           const spec = MODES[id];
+          const isOpen = open === id;
           return (
-            <div key={id}>
-              <button className="modecard" onClick={() => setOpen(open === id ? null : id)}>
-                <h3>{spec.name}</h3>
-                <div className="tagline">{spec.tagline}</div>
-                <p>{spec.description}</p>
+            <div key={id} className={`modeblock${isOpen ? ' modeblock-open' : ''}`}>
+              <button className="modehead" onClick={() => setOpen(isOpen ? null : id)} aria-expanded={isOpen}>
+                <div>
+                  <h3>{spec.name}</h3>
+                  <div className="tagline">{spec.tagline}</div>
+                </div>
+                <span className="chev">{isOpen ? '−' : '+'}</span>
               </button>
-              {open === id && <ModeLauncher mode={id} />}
+              {isOpen && <ModeOptions mode={id} />}
             </div>
           );
         })}
-      </div>
-
-      <div className="grid grid-2" style={{ marginTop: 22 }}>
-        <button className="modecard" onClick={() => navigate('/judgement')}>
-          <h3>Judgement Drills</h3>
-          <div className="tagline">The parts a machine cannot grade.</div>
-          <p>
-            The 55 questions from the Handbook&apos;s own Judge&apos;s Self-Test plus 25 rules items — functions,
-            clauses, phrases, challenges and scoring, each with AGLOA&apos;s answer and explanation.
-          </p>
-        </button>
-        <button className="modecard" onClick={() => navigate('/rules')}>
-          <h3>Senior Reference</h3>
-          <div className="tagline">Every Senior demand, in one place.</div>
-          <p>
-            The complete Senior demand structure, the scoring chart, the time limits and the word rules, each carrying
-            its rule number and a link to the official PDF.
-          </p>
-        </button>
       </div>
     </div>
   );
 }
 
-function ModeLauncher({ mode }: { mode: ModeId }) {
+function ModeOptions({ mode }: { mode: ModeId }) {
   const app = useApp();
   const spec = MODES[mode];
-  const [seconds, setSeconds] = useState(spec.defaultSeconds);
-  const [words, setWords] = useState(spec.requiredWords ?? 3);
-  const [level, setLevel] = useState(3);
-  const [type, setType] = useState<PartOfSpeech | ''>('');
-  const [demandId, setDemandId] = useState('');
+  const [config, setConfig] = useState<SessionConfig>(() => defaultConfig(mode, randomSeed()));
+  const set = (patch: Partial<SessionConfig>) => setConfig((c) => ({ ...c, ...patch }));
 
-  const go = () =>
-    navigate('/drill', {
-      mode,
-      seed: randomSeed(),
-      seconds,
-      words: spec.requiredWords ? words : undefined,
-      level,
-      type: type || undefined,
-      demand: demandId || undefined,
-    });
+  const start = () => navigate('/drill', toParams({ ...config, seed: randomSeed() }));
 
   if (spec.locked) {
     return (
-      <div className="card" style={{ marginTop: 8 }}>
+      <div className="modebody">
         <p className="small dim" style={{ margin: '0 0 12px' }}>
-          Nothing here is adjustable. Twelve shakes, a fixed clock, no pausing and no restarting an individual
-          question — the same discipline as a real round.
+          {spec.description} Nothing here is adjustable — that is the point.
         </p>
-        <button className="btn btn-primary" onClick={() => navigate('/drill', { mode, seed: randomSeed() })}>
+        <button className="btn btn-primary btn-lg" onClick={start}>
           Start Senior Simulation
         </button>
       </div>
     );
   }
 
+  const allTypes = app.ruleset.typeDemands;
+  const chosen = config.types.length ? config.types : allTypes;
   const wordDemands = app.ruleset.generalDemands.filter((d) => d.scope === 'word');
+  const availableDemands = wordDemands.filter(
+    (d) => !d.requiresType || chosen.includes(d.requiresType),
+  );
+
+  const toggleType = (pos: PartOfSpeech) => {
+    const current = config.types.length ? config.types : allTypes;
+    const next = current.includes(pos) ? current.filter((p) => p !== pos) : [...current, pos];
+    // Deselecting everything means "any", not "impossible".
+    set({ types: next.length ? next : [] });
+    // A pinned demand that belongs to a deselected part of speech has to go.
+    const pinned = wordDemands.find((d) => d.id === config.focusDemandId);
+    if (pinned?.requiresType && !next.includes(pinned.requiresType)) set({ focusDemandId: undefined });
+  };
 
   return (
-    <div className="card" style={{ marginTop: 8 }}>
-      <div className="grid" style={{ gap: 12 }}>
-        <Field label={spec.clock === 'per-session' ? 'session length' : 'seconds per shake'}>
+    <div className="modebody">
+      <p className="small dim" style={{ margin: '0 0 16px' }}>
+        {spec.description}
+      </p>
+
+      <Field label="parts of speech">
+        <div className="chips">
+          {allTypes.map((pos) => (
+            <button
+              key={pos}
+              className={`chip chip-toggle${chosen.includes(pos) ? ' chip-on' : ''}`}
+              aria-pressed={chosen.includes(pos)}
+              onClick={() => toggleType(pos)}
+            >
+              {pos}
+            </button>
+          ))}
+          <button className="chip chip-plain" onClick={() => set({ types: [] })}>
+            all
+          </button>
+        </div>
+      </Field>
+
+      <Field label="cubes">
+        <div className="seg">
+          {CUBE_POOLS.map((pool) => (
+            <button key={pool.id} aria-pressed={config.cubePool === pool.id} onClick={() => set({ cubePool: pool.id })}>
+              {pool.label}
+            </button>
+          ))}
+        </div>
+        <div className="tiny faint" style={{ marginTop: 6 }}>
+          {CUBE_POOLS.find((p) => p.id === config.cubePool)!.detail}
+        </div>
+      </Field>
+
+      <Field label={spec.clock === 'per-session' ? 'session length' : 'seconds per shake'}>
+        <div className="chips">
+          {SECONDS.map((n) => (
+            <button
+              key={n}
+              className={`chip chip-toggle${config.seconds === n ? ' chip-on' : ''}`}
+              aria-pressed={config.seconds === n}
+              onClick={() => set({ seconds: n })}
+            >
+              {n}s
+            </button>
+          ))}
+          <NumberBox value={config.seconds} min={5} max={600} suffix="s" onChange={(seconds) => set({ seconds })} />
+        </div>
+        {spec.escalating && <div className="tiny faint" style={{ marginTop: 6 }}>Starting clock — it shortens every level.</div>}
+      </Field>
+
+      {spec.requiredWords !== undefined && (
+        <Field label="valid words to clear a shake">
+          <div className="chips">
+            {WORDS.map((n) => (
+              <button
+                key={n}
+                className={`chip chip-toggle${config.requiredWords === n ? ' chip-on' : ''}`}
+                aria-pressed={config.requiredWords === n}
+                onClick={() => set({ requiredWords: n })}
+              >
+                {n}
+              </button>
+            ))}
+            <NumberBox
+              value={config.requiredWords ?? 1}
+              min={1}
+              max={50}
+              onChange={(requiredWords) => set({ requiredWords })}
+            />
+          </div>
+        </Field>
+      )}
+
+      {!spec.escalating && (
+        <Field label="extra demands">
           <div className="seg">
-            {(spec.clock === 'per-session' ? [60, 90, 120, 180] : [10, 15, 20, 30]).map((n) => (
-              <button key={n} aria-pressed={seconds === n} onClick={() => setSeconds(n)}>
-                {n}s
+            {DEMAND_PRESSURE.map((p) => (
+              <button key={p.level} aria-pressed={config.level === p.level} onClick={() => set({ level: p.level })}>
+                {p.label}
               </button>
             ))}
           </div>
+          <div className="tiny faint" style={{ marginTop: 6 }}>
+            How many general demands stack on top of the Type Demand — letter counts, double letters, plural, participle
+            and so on.
+          </div>
         </Field>
+      )}
 
-        {spec.requiredWords !== undefined && !spec.escalating && (
-          <Field label="valid words required">
-            <div className="seg">
-              {[1, 3, 5, 10].map((n) => (
-                <button key={n} aria-pressed={words === n} onClick={() => setWords(n)}>
-                  {n}
-                </button>
-              ))}
-            </div>
-          </Field>
-        )}
+      <Field label="always demand (optional)">
+        <select
+          className="select"
+          value={config.focusDemandId ?? ''}
+          onChange={(e) => set({ focusDemandId: e.target.value || undefined })}
+        >
+          <option value="">nothing pinned</option>
+          {availableDemands.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.requiresType ? `${d.requiresType}: ` : ''}
+              {d.label}
+            </option>
+          ))}
+        </select>
+      </Field>
 
-        {!spec.escalating && (
-          <Field label="difficulty">
-            <div className="seg">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button key={n} aria-pressed={level === n} onClick={() => setLevel(n)}>
-                  {n}
-                </button>
-              ))}
-            </div>
-          </Field>
-        )}
-
-        {mode === 'category-gauntlet' && (
-          <>
-            <Field label="type demand">
-              <select
-                className="btn btn-sm"
-                value={type}
-                onChange={(e) => setType(e.target.value as PartOfSpeech | '')}
-                style={{ background: 'var(--bg-sunken)' }}
-              >
-                <option value="">any</option>
-                {app.ruleset.typeDemands.map((pos) => (
-                  <option key={pos} value={pos}>
-                    {pos}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="general demand always in force">
-              <select
-                className="btn btn-sm"
-                value={demandId}
-                onChange={(e) => setDemandId(e.target.value)}
-                style={{ background: 'var(--bg-sunken)', maxWidth: '100%' }}
-              >
-                <option value="">none</option>
-                {wordDemands
-                  .filter((d) => !d.requiresType || !type || d.requiresType === type)
-                  .map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.requiresType ? `${d.requiresType}: ` : ''}
-                      {d.label}
-                    </option>
-                  ))}
-              </select>
-            </Field>
-          </>
-        )}
-
-        <div>
-          <button className="btn btn-primary" onClick={go}>
-            Start {spec.name}
-          </button>
-        </div>
+      <div className="row spread" style={{ marginTop: 18, gap: 12 }}>
+        <div className="mono small dim">{summarise(config, allTypes)}</div>
+        <button className="btn btn-primary btn-lg" onClick={start}>
+          Start {spec.name}
+        </button>
       </div>
     </div>
   );
 }
 
+function NumberBox({
+  value,
+  min,
+  max,
+  suffix,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  suffix?: string;
+  onChange(value: number): void;
+}) {
+  return (
+    <span className="numberbox">
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        aria-label="custom value"
+        onChange={(e) => {
+          const n = Number(e.target.value);
+          if (Number.isFinite(n)) onChange(Math.max(min, Math.min(max, Math.round(n))));
+        }}
+      />
+      {suffix}
+    </span>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="row spread" style={{ gap: 12 }}>
-      <span className="eyebrow">{label}</span>
+    <div style={{ marginBottom: 16 }}>
+      <div className="eyebrow" style={{ marginBottom: 7 }}>
+        {label}
+      </div>
       {children}
     </div>
   );
+}
+
+/** The one-line "here is exactly what you are about to play" readout. */
+export function summarise(config: SessionConfig, allTypes: PartOfSpeech[]): string {
+  const types = config.types.length && config.types.length < allTypes.length ? config.types.join(' + ') : 'any type';
+  const pool = CUBE_POOLS.find((p) => p.id === config.cubePool)!.label.toLowerCase();
+  const bits = [types, pool, `${config.seconds}s`];
+  if (config.requiredWords) bits.push(`${config.requiredWords} to clear`);
+  return bits.join(' · ');
+}
+
+/** Config → URL params, so a drill can be linked and replayed exactly. */
+export function toParams(config: SessionConfig): Record<string, string | number | undefined> {
+  return {
+    mode: config.mode,
+    seed: config.seed,
+    seconds: config.seconds,
+    words: config.requiredWords,
+    level: config.level,
+    types: config.types.length ? config.types.join(',') : undefined,
+    cubes: config.cubePool,
+    demand: config.focusDemandId,
+  };
 }

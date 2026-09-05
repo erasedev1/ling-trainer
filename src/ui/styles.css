@@ -600,6 +600,117 @@ table.data td.num {
   background: rgba(106, 169, 240, 0.06);
 }
 
+.modelist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modeblock {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+.modeblock-open {
+  border-color: var(--accent-dim);
+}
+
+.modehead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  text-align: left;
+}
+.modehead:hover {
+  background: #171c22;
+}
+.modehead h3 {
+  font-size: 17px;
+}
+.modehead .tagline {
+  font-size: 13px;
+  color: var(--accent);
+  margin-top: 2px;
+}
+.modehead .chev {
+  font-family: var(--mono);
+  font-size: 20px;
+  color: var(--ink-faint);
+  line-height: 1;
+}
+
+.modebody {
+  padding: 4px 16px 18px;
+  border-top: 1px solid var(--line);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.chip-toggle {
+  cursor: pointer;
+  text-transform: capitalize;
+  background: var(--bg-sunken);
+}
+.chip-toggle:hover {
+  border-color: var(--accent-dim);
+}
+.chip-toggle.chip-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06120d;
+  font-weight: 600;
+}
+.chip-plain {
+  border-style: dashed;
+  color: var(--ink-faint);
+}
+
+.numberbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 8px 3px 4px;
+  border-radius: 99px;
+  border: 1px dashed var(--line-strong);
+  color: var(--ink-dim);
+  font-size: 12px;
+  font-family: var(--mono);
+}
+.numberbox input {
+  width: 52px;
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+  -moz-appearance: textfield;
+}
+.numberbox input::-webkit-outer-spin-button,
+.numberbox input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.select {
+  padding: 8px 11px;
+  border-radius: var(--r);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line-strong);
+  font-size: 13px;
+  max-width: 100%;
+}
+
 .modecard {
   display: block;
   text-align: left;

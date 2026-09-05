@@ -11,17 +11,16 @@ import { TRAINING_SCORE_LABEL } from '../../engine/scoring/score';
 
 export function Stats() {
   const app = useApp();
-  const { shakes, sessions, judgement, records } = app.data;
+  const { shakes, sessions, records } = app.data;
 
   const breaks = useMemo(
-    () =>
-      breakdowns(shakes, (id) => app.ruleset.generalDemands.find((d) => d.id === id)?.label ?? id, judgement),
-    [shakes, judgement, app.ruleset],
+    () => breakdowns(shakes, (id) => app.ruleset.generalDemands.find((d) => d.id === id)?.label ?? id),
+    [shakes, app.ruleset],
   );
   const weak = useMemo(() => weaknesses(breaks), [breaks]);
   const t = useMemo(() => totals(shakes, sessions), [shakes, sessions]);
 
-  if (!shakes.length && !judgement.length) {
+  if (!shakes.length) {
     return (
       <div className="page page-narrow">
         <h1 style={{ fontSize: 26, marginBottom: 8 }}>No data yet</h1>
@@ -55,8 +54,8 @@ export function Stats() {
         </div>
         {weak.length === 0 ? (
           <p className="dim" style={{ margin: 0 }}>
-            Nothing is clearly weak yet. Keep running drills — a category needs four shakes or four judgement items
-            before it is worth calling out, and the trainer will not invent a weakness to fill the space.
+            Nothing is clearly weak yet. Keep running drills — a category needs four shakes before it is worth
+            calling out, and the trainer will not invent a weakness to fill the space.
           </p>
         ) : (
           <>
@@ -86,29 +85,6 @@ export function Stats() {
         <BucketCard title="by general demand" buckets={breaks.byDemand} limit={12} />
         <BucketCard title="by sentence designation" buckets={breaks.byDesignation} limit={12} />
       </div>
-
-      {breaks.byTopic.length > 0 && (
-        <div className="card" style={{ marginBottom: 18 }}>
-          <div className="row spread" style={{ marginBottom: 10 }}>
-            <span className="eyebrow">judgement topics — functions, clauses, phrases, rules</span>
-            <span className="tiny faint">accuracy · items</span>
-          </div>
-          {[...breaks.byTopic]
-            .sort((a, b) => b.shakes - a.shakes)
-            .slice(0, 16)
-            .map((bucket) => (
-              <div key={bucket.key} className="bar">
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{bucket.label}</span>
-                <span className={`track${bucket.accuracy < 0.5 ? ' weak' : bucket.accuracy < 0.75 ? ' mid' : ''}`}>
-                  <i style={{ width: `${Math.round(bucket.accuracy * 100)}%` }} />
-                </span>
-                <span className="n">
-                  {Math.round(bucket.accuracy * 100)}%<span className="faint tiny"> ·{bucket.shakes}</span>
-                </span>
-              </div>
-            ))}
-        </div>
-      )}
 
       <div className="card" style={{ marginBottom: 18 }}>
         <div className="eyebrow" style={{ marginBottom: 10 }}>

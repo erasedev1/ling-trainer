@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { gradeSubmission, solveShake } from '../src/engine/demands/solve';
 import { officialScore } from '../src/engine/scoring/score';
 import { stackViolations, canAddDemand } from '../src/engine/demands/legality';
-import { JUDGEMENT_BANK, RULE_BANK } from '../data/judgement-bank';
 import { APPROXIMATE_2026, CUBE_COLOR_COUNTS } from '../data/cube-sets';
 import { cubes, functionDemand, generalDemand, lexicon, ruleset, shake, typeDemand } from './helpers';
 
@@ -150,32 +149,5 @@ describe('cube set matches the published colour counts', () => {
 
   it('only allows black and green cubes to be played as demands (LT 8)', () => {
     expect(APPROXIMATE_2026.demandColors.sort()).toEqual(['black', 'green']);
-  });
-});
-
-describe('curated question banks', () => {
-  it('has unique judgement ids, a yes/no answer and an explanation for each', () => {
-    const ids = new Set<string>();
-    for (const item of JUDGEMENT_BANK) {
-      expect(ids.has(item.id), item.id).toBe(false);
-      ids.add(item.id);
-      expect(['yes', 'no']).toContain(item.answer);
-      expect(item.explanation.length).toBeGreaterThan(20);
-      expect(item.topics.length).toBeGreaterThan(0);
-      expect(item.source.length).toBeGreaterThan(0);
-    }
-    expect(JUDGEMENT_BANK.length).toBeGreaterThanOrEqual(55);
-  });
-
-  it('has rule items whose correct index points at a real option', () => {
-    const ids = new Set<string>();
-    for (const item of RULE_BANK) {
-      expect(ids.has(item.id), item.id).toBe(false);
-      ids.add(item.id);
-      expect(item.options.length).toBeGreaterThanOrEqual(3);
-      expect(item.correct).toBeGreaterThanOrEqual(0);
-      expect(item.correct).toBeLessThan(item.options.length);
-      expect(item.explanation.length).toBeGreaterThan(20);
-    }
   });
 });

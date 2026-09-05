@@ -104,15 +104,49 @@ export const MODES: Record<ModeId, ModeSpec> = {
   },
 };
 
+/**
+ * How much of the mat a solver may use.
+ *
+ * The rules ration Resources differently depending on how the shake ends, and
+ * each is worth practising: 'challenge-now' is the live-play case (LT 19 A),
+ * 'forceout' the two-cube case (LT 24), and 'all' opens every rolled cube for a
+ * pure vocabulary sprint.
+ */
+export type CubePool = 'challenge-now' | 'forceout' | 'all';
+
+export const CUBE_POOLS: { id: CubePool; label: string; detail: string }[] = [
+  { id: 'challenge-now', label: 'Letters + 1', detail: 'Challenge Now — the cubes on the mat plus one from Resources (LT 19 A)' },
+  { id: 'forceout', label: 'Letters + 2', detail: 'Forceout — the cubes on the mat plus two from Resources (LT 24)' },
+  { id: 'all', label: 'All cubes', detail: 'Every rolled cube is available — a pure speed drill, not a live-play position' },
+];
+
 export interface SessionConfig {
   mode: ModeId;
   seed: number;
   seconds: number;
   requiredWords?: number;
+  /** Extra general demands stacked on the shake, 1 (none) … 5 (heavy). */
   level: number;
-  /** Category Gauntlet focus. */
-  focusType?: PartOfSpeech;
+  /** Type Demands the shake may use. Empty means all of them. */
+  types: PartOfSpeech[];
+  /** Which cubes the solver may draw on. */
+  cubePool: CubePool;
+  /** Pin one general demand into every shake. */
   focusDemandId?: string;
+}
+
+/** Config for a mode with nothing chosen yet. */
+export function defaultConfig(mode: ModeId, seed: number): SessionConfig {
+  const spec = MODES[mode];
+  return {
+    mode,
+    seed,
+    seconds: spec.defaultSeconds,
+    requiredWords: spec.requiredWords,
+    level: 3,
+    types: [],
+    cubePool: 'challenge-now',
+  };
 }
 
 export interface ShakeRecord {
@@ -159,8 +193,9 @@ function nextScenario(config: SessionConfig, deps: SessionDeps, index: number): 
     cubeSet: deps.cubeSet,
     lexicon: deps.lexicon,
     targetLevel: level,
-    type: config.mode === 'category-gauntlet' ? config.focusType : undefined,
-    requireDemandId: config.mode === 'category-gauntlet' ? config.focusDemandId : undefined,
+    types: config.types,
+    requireDemandId: config.focusDemandId,
+    solveContext: config.cubePool === 'all' ? 'open' : config.cubePool,
     minAnswers: Math.max(1, (config.requiredWords ?? spec.requiredWords ?? 1) + 1),
   });
 }

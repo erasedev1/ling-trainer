@@ -61,7 +61,23 @@ with no extra configuration, and deep links like `#/drill?mode=max-out` survive 
 | **Random Gauntlet** | Same, with the demand stack drawn at random. Adaptability. |
 | **Progressive Speed** | Less time, bigger quota, harder shakes each level. Ends the first time you miss. |
 | **Senior Simulation** | Twelve shakes, fixed sequence, nothing adjustable, full report at the end. |
-| **Judgement Drills** | The 55 questions from the Handbook's own Judge's Self-Test plus 25 rules items, with AGLOA's answers and explanations. |
+
+## Setting up a drill
+
+Every mode except the Senior Simulation opens to its own options, and each one changes what
+the engine actually generates:
+
+| Option | What it does |
+| --- | --- |
+| **Parts of speech** | Which Type Demands the shakes may use. Pick any combination — "noun + verb", "prepositions only". Deselecting everything means *any*. |
+| **Cubes** | `Letters + 1` is live play — the mat plus one cube from Resources (LT 19 A). `Letters + 2` is the Forceout case (LT 24). `All cubes` opens every rolled cube: not a real board position, but the best pure vocabulary sprint. |
+| **Seconds** | Presets, or type an exact number. |
+| **Words to clear** | The quota, where the mode has one. |
+| **Extra demands** | How many general demands stack on the Type Demand — None through Brutal. |
+| **Always demand** | Pin one general demand into every shake (plural nouns, double consonant, past participle …) to grind exactly that. |
+
+The choices ride in the URL, so a drill is shareable and repeatable:
+`#/drill?mode=shake-sprint&types=noun,verb&cubes=all&seconds=60`.
 
 ## Two things worth knowing before you use it
 
@@ -80,7 +96,7 @@ or *passive voice* are properties of the sentence you would write, not of the wo
   participle, collective, compound, pronoun class and case, regular/irregular…) are graded
   against a complete answer key;
 - sentence-level demands are displayed and marked `sentence` — they are yours to satisfy in a
-  real solution, and are drilled separately in Judgement Drills;
+  real solution, and the trainer does not pretend to grade them;
 - a real word the trainer has no grammar data for is reported **UNVERIFIED** and counts
   neither for nor against you.
 
@@ -91,8 +107,8 @@ The full reasoning, and the two genuinely open questions, are in
 
 The per-drill number is a **training score, not official AGLOA scoring** — it is labelled that
 way in the app. Official scoring awards 6 / 4 / 2 per shake among three players and has no
-meaning for a solo drill; the real chart is implemented, shown on the Rules page, and used by
-the rule-knowledge drills.
+meaning for a solo drill. The real chart is still implemented in `data/senior-2026.ts` and
+covered by tests.
 
 ## Documentation
 
@@ -106,5 +122,5 @@ the rule-knowledge drills.
 `data/senior-2026.ts` is the whole rule configuration: patterns, structures, purposes, type and
 function demands, every general demand LT 16 A–R, limits, timings, penalties and the scoring
 chart. Copy it, edit it, point the app at the new file. No engine code hard-codes a rule, and
-the in-app Rules page renders from the same object, so the reference cannot drift from what
-the engine enforces.
+the drill options are built from the same object, so the parts of speech and demands a player
+can pick cannot drift from what the engine enforces.

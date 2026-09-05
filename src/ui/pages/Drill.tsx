@@ -5,7 +5,10 @@ import { Board, DemandStack, DesignationLine, solveContextNote } from '../compon
 import { AnswerInput } from '../components/AnswerInput';
 import { Stat, Timer } from '../components/Timer';
 import {
+  CUBE_POOLS,
   MODES,
+  defaultConfig,
+  type CubePool,
   completeShake,
   isSessionOver,
   nextShake,
@@ -22,7 +25,27 @@ import { TRAINING_SCORE_LABEL } from '../../engine/scoring/score';
 import { toSessionLog, toShakeLogs } from '../../engine/stats/stats';
 import { applyRecords, candidatesFor, type PersonalRecord } from '../../engine/stats/records';
 import { randomSeed } from '../../engine/shake/rng';
+import { toParams } from './Home';
 import type { PartOfSpeech } from '../../engine/types';
+
+/** URL params → a fully-specified session config. */
+function fromParams(mode: ModeId, params: URLSearchParams): SessionConfig {
+  const base = defaultConfig(mode, Number(params.get('seed')) || randomSeed());
+  const types = (params.get('types') ?? '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean) as PartOfSpeech[];
+  const cubes = params.get('cubes');
+  return {
+    ...base,
+    seconds: Number(params.get('seconds')) || base.seconds,
+    requiredWords: params.get('words') ? Number(params.get('words')) : base.requiredWords,
+    level: Number(params.get('level')) || base.level,
+    types,
+    cubePool: CUBE_POOLS.some((p) => p.id === cubes) ? (cubes as CubePool) : base.cubePool,
+    focusDemandId: params.get('demand') || undefined,
+  };
+}
 
 const TICK_MS = 100;
 
@@ -50,16 +73,7 @@ export function Drill({ route }: { route: Route }) {
   const mode = (route.params.get('mode') ?? 'shake-sprint') as ModeId;
   const spec = MODES[mode] ?? MODES['shake-sprint'];
 
-  const config: SessionConfig = useMemo(
-    () => ({
-      mode: spec.id,
-      seed: Number(route.params.get('seed')) || randomSeed(),
-      seconds: Number(route.params.get('seconds')) || spec.defaultSeconds,
-      requiredWords: route.params.get('words') ? Number(route.params.get('words')) : spec.requiredWords,
-      level: Number(route.params.get('level')) || 3,
-      focusType: (route.params.get('type') as PartOfSpeech) || undefined,
-      focusDemandId: route.params.get('demand') || undefined,
-    }),
+  const config: SessionConfig = useMemo(() => fromParams(spec.id, route.params),
     // The config is intentionally frozen for the life of the session: a drill
     // whose parameters can change mid-run is not a measurement.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -419,17 +433,7 @@ function SessionReport({
       <div className="row">
         <button
           className="btn btn-primary btn-lg"
-          onClick={() =>
-            navigate('/drill', {
-              mode: config.mode,
-              seconds: config.seconds,
-              words: config.requiredWords,
-              level: config.level,
-              type: config.focusType,
-              demand: config.focusDemandId,
-              seed: randomSeed(),
-            })
-          }
+          onClick={() => navigate('/drill', toParams({ ...config, seed: randomSeed() }))}
         >
           Run it again
         </button>

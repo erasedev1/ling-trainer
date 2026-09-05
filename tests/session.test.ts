@@ -4,6 +4,7 @@ import {
   completeShake,
   isSessionOver,
   nextShake,
+  defaultConfig,
   quotaForShake,
   secondsForShake,
   startSession,
@@ -13,7 +14,7 @@ import {
 } from '../src/engine/modes/session';
 import { scoreShake, officialScore } from '../src/engine/scoring/score';
 import { applyRecords, candidatesFor } from '../src/engine/stats/records';
-import { breakdowns, toSessionLog, toShakeLogs, topicBreakdown, totals, weaknesses } from '../src/engine/stats/stats';
+import { breakdowns, toSessionLog, toShakeLogs, totals, weaknesses } from '../src/engine/stats/stats';
 import { createLocalStore } from '../src/engine/persistence/store';
 import { cubeSet, lexicon, ruleset } from './helpers';
 import type { SubmissionResult } from '../src/engine/types';
@@ -21,8 +22,7 @@ import type { SubmissionResult } from '../src/engine/types';
 const deps = () => ({ ruleset, cubeSet, lexicon: lexicon() });
 
 const config = (patch: Partial<SessionConfig> = {}): SessionConfig => ({
-  mode: 'shake-sprint',
-  seed: 1234,
+  ...defaultConfig(patch.mode ?? 'shake-sprint', 1234),
   seconds: 15,
   level: 2,
   ...patch,
@@ -220,17 +220,6 @@ describe('statistics', () => {
     expect(weak[0].label).toBe('adverb');
   });
 
-  it('scores judgement topics from answered items', () => {
-    const buckets = topicBreakdown([
-      { at: 0, itemId: 'a', kind: 'analysis', topics: ['phrase.gerund'], correct: false },
-      { at: 0, itemId: 'b', kind: 'analysis', topics: ['phrase.gerund'], correct: false },
-      { at: 0, itemId: 'c', kind: 'analysis', topics: ['clause.noun'], correct: true },
-    ]);
-    const gerund = buckets.find((b) => b.key === 'phrase.gerund')!;
-    expect(gerund.accuracy).toBe(0);
-    expect(gerund.label).toBe('gerund phrase');
-    expect(buckets.find((b) => b.key === 'clause.noun')!.accuracy).toBe(1);
-  });
 });
 
 describe('personal records', () => {
@@ -264,5 +253,66 @@ describe('persistence', () => {
 
     memory.set('ling-trainer:v1', 'not json');
     expect(createLocalStore(storage).load().shakes).toEqual([]);
+  });
+});
+
+describe('drill options', () => {
+  it('only ever demands a part of speech the player selected', () => {
+    for (const types of [['noun'], ['noun', 'verb'], ['preposition'], ['adjective', 'adverb']] as const) {
+      for (let seed = 0; seed < 12; seed++) {
+        let state = startSession(config({ seed: seed * 7 + 1, types: [...types] }), deps());
+        expect(types).toContain(state.scenario.type);
+        for (let i = 0; i < 3; i++) {
+          state = completeShake(state);
+          state = nextShake(state, deps());
+          expect(types, `seed ${seed} shake ${i}`).toContain(state.scenario.type);
+        }
+      }
+    }
+  });
+
+  it('treats an empty selection as "any part of speech" rather than as impossible', () => {
+    const state = startSession(config({ types: [] }), deps());
+    expect(ruleset.typeDemands).toContain(state.scenario.type);
+    expect(state.scenario.answerKey.count).toBeGreaterThan(0);
+  });
+
+  it('honours the cube pool: more cubes means more available answers', () => {
+    const counts = (cubePool: SessionConfig['cubePool']) =>
+      startSession(config({ seed: 20260905, types: ['noun'], cubePool, level: 1 }), deps()).scenario;
+
+    const now = counts('challenge-now');
+    const forceout = counts('forceout');
+    const all = counts('all');
+
+    expect(now.shake.resourceAllowance).toBe(1);
+    expect(forceout.shake.resourceAllowance).toBe(2);
+    expect(all.shake.solveContext).toBe('open');
+    expect(all.shake.resourceAllowance).toBeGreaterThan(2);
+    expect(all.answerKey.count).toBeGreaterThan(now.answerKey.count);
+  });
+
+  it('accepts a word from anywhere on the mat once "all cubes" is chosen', () => {
+    const state = startSession(config({ seed: 5150, types: ['noun'], cubePool: 'all', level: 1 }), deps());
+    // A word needing several Resources cubes is legal here and would not be
+    // under Challenge Now.
+    const long = state.scenario.answerKey.words.find((w) => w.length >= 7);
+    if (!long) return;
+    expect(submit(state, long, deps()).submissions[0].verdict).toBe('valid');
+  });
+
+  it('uses the chosen clock and quota exactly', () => {
+    const state = startSession(config({ seconds: 60, requiredWords: 4 }), deps());
+    expect(state.remainingMs).toBe(60000);
+    expect(quotaForShake(state.config, 0)).toBe(4);
+  });
+
+  it('keeps a pinned general demand in force on every shake', () => {
+    let state = startSession(config({ types: ['noun'], focusDemandId: 'noun.plural', seconds: 30 }), deps());
+    for (let i = 0; i < 3; i++) {
+      expect(state.scenario.shake.demands.some((d) => d.defId === 'noun.plural'), `shake ${i}`).toBe(true);
+      state = completeShake(state);
+      state = nextShake(state, deps());
+    }
   });
 });

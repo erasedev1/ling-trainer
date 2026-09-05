@@ -1,6 +1,6 @@
 import type { CubeSet } from '../types';
 import type { RecordBook } from '../stats/records';
-import type { JudgementLog, SessionLog, ShakeLog } from '../stats/stats';
+import type { SessionLog, ShakeLog } from '../stats/stats';
 
 /**
  * Local persistence.
@@ -29,7 +29,6 @@ export interface StoredData {
   settings: Settings;
   shakes: ShakeLog[];
   sessions: SessionLog[];
-  judgement: JudgementLog[];
   records: RecordBook;
 }
 
@@ -41,7 +40,6 @@ export const DEFAULT_SETTINGS: Settings = {
 const KEY = 'ling-trainer:v1';
 const MAX_SHAKES = 4000;
 const MAX_SESSIONS = 400;
-const MAX_JUDGEMENT = 2000;
 
 export interface Store {
   load(): StoredData;
@@ -56,7 +54,6 @@ function freshData(): StoredData {
     settings: { ...DEFAULT_SETTINGS },
     shakes: [],
     sessions: [],
-    judgement: [],
     records: {},
   };
 }
@@ -81,7 +78,6 @@ export function createLocalStore(storage: Storage | undefined = globalThis.local
         ...data,
         shakes: data.shakes.slice(-MAX_SHAKES),
         sessions: data.sessions.slice(-MAX_SESSIONS),
-        judgement: data.judgement.slice(-MAX_JUDGEMENT),
       };
       try {
         storage.setItem(KEY, JSON.stringify(trimmed));

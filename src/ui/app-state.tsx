@@ -4,7 +4,7 @@ import { SENIOR_2026, type Ruleset } from '../../data/senior-2026';
 import { APPROXIMATE_2026, CUBE_SETS } from '../../data/cube-sets';
 import type { CubeSet } from '../engine/types';
 import { createLocalStore, type Settings, type StoredData } from '../engine/persistence/store';
-import type { JudgementLog, SessionLog, ShakeLog } from '../engine/stats/stats';
+import type { SessionLog, ShakeLog } from '../engine/stats/stats';
 import type { RecordBook } from '../engine/stats/records';
 
 interface AppValue {
@@ -17,7 +17,6 @@ interface AppValue {
   /** Append finished shakes as they happen, so nothing is lost if the player walks away. */
   recordShakes(shakes: ShakeLog[]): void;
   recordSession(session: SessionLog, records: RecordBook): void;
-  recordJudgement(entry: JudgementLog): void;
   clearAll(): void;
 }
 
@@ -84,9 +83,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     recordSession(session, records) {
       persist((previous) => ({ ...previous, sessions: [...previous.sessions, session], records }));
-    },
-    recordJudgement(entry) {
-      persist((previous) => ({ ...previous, judgement: [...previous.judgement, entry] }));
     },
     clearAll() {
       store.clear();
