@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../app-state';
 import { CUBE_COLOR_COUNTS, CUBE_SETS } from '../../../data/cube-sets';
 import type { Cube, CubeColor, CubeSet } from '../../engine/types';
-import { Cube as CubeView } from '../components/Board';
+
 
 /**
  * The cube editor exists because AGLOA does not publish the letter faces — see
@@ -39,16 +39,16 @@ export function Settings() {
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="eyebrow" style={{ marginBottom: 8 }}>
-          answer key
+          results
         </div>
         <label className="row spread">
-          <span className="small">Missed words shown after a shake</span>
+          <span className="small">Missed words listed after a roll</span>
           <input
             type="number"
             min={5}
-            max={200}
-            value={settings.showAnswerKeyLimit}
-            onChange={(e) => app.updateSettings({ showAnswerKeyLimit: Math.max(5, Number(e.target.value) || 40) })}
+            max={400}
+            value={settings.showMissedLimit}
+            onChange={(e) => app.updateSettings({ showMissedLimit: Math.max(5, Number(e.target.value) || 60) })}
             className="btn btn-sm mono"
             style={{ width: 90, background: 'var(--bg-sunken)', textAlign: 'right' }}
           />
@@ -63,8 +63,7 @@ export function Settings() {
           The official AGLOA materials publish the cube <b>colours</b> — four each of red, black, green, pink and yellow
           plus three orange — and two facts about their content: two red cubes must contain a U, and some red cubes carry
           a C instead. They do <b>not</b> publish the six faces of any cube. The set shipped here is a documented
-          approximation. Read the faces off your club&apos;s physical set and paste them below to make every generated
-          shake exact.
+          approximation. Read the faces off your club&apos;s physical set and paste them below to make every roll exact.
         </div>
 
         <div className="row" style={{ marginBottom: 12 }}>
@@ -96,7 +95,9 @@ export function Settings() {
                 .map((cube) => (
                   <span key={cube.id} className="row" style={{ gap: 3 }}>
                     {cube.faces.map((face, i) => (
-                      <CubeView key={i} letter={face} color={color} small />
+                      <span key={i} className={`cube cube-sm cube-${color}`}>
+                        {face}
+                      </span>
                     ))}
                   </span>
                 ))}

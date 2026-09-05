@@ -1,130 +1,69 @@
-# Phase 2 — Architecture
+# Architecture
 
-The rule is simple: **no LinguiSHTIK logic lives in a React component.** Everything under
-`src/engine/` is plain TypeScript with no DOM and no framework, so the whole game engine
-is unit-testable on its own — `tests/` imports it directly, and the 96 tests never touch
-a browser.
+**No LinguiSHTIK logic lives in a React component.** Everything under `src/engine/` is plain
+TypeScript with no DOM and no framework, so the engine is unit tested on its own — `tests/`
+imports it directly and never touches a browser.
 
 ```
-data/                       RULE CONFIGURATION — data, never logic
-  senior-2026.ts              the Senior Division ruleset (add a file per revision)
-  cube-sets.ts                the 23 cubes, labelled by provenance
-  closed-class.json           pronouns / prepositions / conjunctions / interjections /
-                              linking verbs / auxiliaries / collective nouns, from the Handbook
+data/
+  senior-2026.ts        rule configuration: parts of speech (LT 9), word rules (LT 2, LT 22)
+  cube-sets.ts          the 23 cubes, labelled by provenance
+  closed-class.json     pronouns / prepositions / conjunctions / interjections / linking
+                        verbs / auxiliaries / collective nouns, from the Handbook
 
 scripts/
-  build_lexicon.py          builds public/data/lexicon.json from open sources
+  build_lexicon.py      builds public/data/lexicon.json from open sources
 
-src/engine/                 THE ENGINE — no React, no DOM
-  types.ts                    shared vocabulary
-  lexicon/                    dictionary provider: spellings, tags, frequency, indices
-  shake/rng.ts                seeded RNG (every shake is reproducible from its seed)
-  shake/pool.ts               what letters a solver may use, with wilds and letter transfer
-  demands/predicates.ts       one predicate per word-level demand
-  demands/legality.ts         which demands may be stacked together (LT 13 B2, LT 16 M/N/Q/R)
-  demands/solve.ts            answer-key solver + submission grading
-  generator/scenario.ts       shake generation and difficulty profiling
-  scoring/score.ts            training score, plus the official AGLOA scoring chart
-  modes/session.ts            every training mode as one pure state machine
-  stats/stats.ts              breakdowns, weakness detection
-  stats/records.ts            personal records
-  persistence/store.ts        local storage behind a `Store` interface
+src/engine/
+  types.ts              shared vocabulary
+  lexicon/              the dictionary: spellings, part-of-speech tags, frequency, indices
+  shake/rng.ts          seeded RNG — every roll is reproducible from its seed
+  roll/roll.ts          the roll, its letters, the answer key, and grading one word
+  roll/session.ts       the drill as a pure state machine: start, submit, tick, finish
+  stats/                per-part-of-speech rates, totals, personal bests
+  persistence/store.ts  local storage behind a `Store` interface
 
-src/ui/                     REACT — rendering and input only
-  app-state.tsx               loads the lexicon once, owns persisted data
-  router.ts                   hash routing; a drill URL carries its own configuration
-  components/                 Board, AnswerInput, Timer
-  pages/                      Home (mode + options), Drill, Stats, Settings
+src/ui/
+  app-state.tsx         loads the lexicon once, owns persisted data
+  router.ts             hash routing; a drill URL carries its own configuration
+  pages/                Home (setup), Drill, Stats, Settings
 ```
 
-## The two decisions that shape everything
+## The drill
 
-### 1. Word-scope vs sentence-scope demands
+`createRoll` rolls every cube in the set onto one face. `answerKey` then walks the lexicon
+once per chosen part of speech and keeps every word that is 4–10 letters, spellable from the
+rolled letters, and tagged with that part of speech — deduplicated, ordered most-common
+first. `gradeWord` applies the same rules to one typed word, so the key and the grader can
+never disagree; a test asserts exactly that.
 
-Every demand in `data/senior-2026.ts` carries a `scope`:
+Spelling is a plain multiset check: one cube spells one letter, so a word needing two Ms
+needs two M cubes. Letter counts for the whole lexicon are precomputed as one packed
+`Uint8Array`, and the roll's own counts are computed once per drill, so grading a submission
+is 26 integer comparisons.
 
-| scope | meaning | example |
-| --- | --- | --- |
-| `word` | decidable from the word alone → **graded** | double consonant, plural noun, past participle |
-| `sentence` | a property of the sentence the player would write → **shown, never graded** | subject, in a gerund phrase, passive voice |
-| `board` | changes what letters exist → applied to the pool | colour wild, letter transfer |
+## Why rate, not coverage
 
-The Shake Sprint answer key is *complete* with respect to `word` demands, so "you missed 6"
-is a true statement rather than a guess. Sentence-scope demands still appear on screen —
-reading a full demand stack at speed is itself a trained skill — with a visible `sentence`
-tag so nothing is misrepresented. The reasoning is in [RESEARCH.md §3](RESEARCH.md#3-what-can-and-cannot-be-validated-automatically).
+A roll of all 23 cubes typically allows a few *thousand* words. "Share of what was available"
+would sit near zero for everybody and say nothing, so the statistics track **words found per
+minute** per part of speech instead, and only call one out when it is clearly behind the
+player's own best across at least three rolls. An empty result means "nothing stands out
+yet", not "everything is fine".
 
-### 2. Generate, then verify
-
-`generateScenario` never emits a shake whose answer key it has not computed:
-
-1. roll all 23 cubes, designate a pattern / structure / purpose;
-2. set the Type and Function Demands;
-3. **grow** LETTERS one cube at a time until answers exist;
-4. **add** demands one at a time, keeping each only if the shake still has enough answers;
-5. add one or two sentence-scope demands for realism;
-6. re-solve and profile the difficulty.
-
-Every candidate demand passes `canAddDemand` first, which encodes the counting limits
-(LT 13 B2, LT 16 M/N/Q) and the dependencies the Handbook states — no clause demand under a
-`simple` or `compound` designation, no section-R function before a clause or phrase exists,
-no "function for gerund" unless gerund is the Function Demand.
-
-The cost is a handful of solves per shake (~5 ms); the payoff is that an unsolvable or
-self-contradictory scenario cannot reach the player.
-
-### Difficulty is gameplay difficulty
-
-`DifficultyProfile` blends four things, none of which is sentence length:
-
-- **scarcity** — how few answers exist (dominant term)
-- **constraint count** — simultaneous word-level demands
-- **rarity** — frequency tier of the easiest answer
-- **decoys** — common words that fit the letters but are the wrong part of speech, which is
-  what punishes sloppy pattern recognition even when answers are plentiful
-
-## Modes
-
-All seven modes are one state machine (`modes/session.ts`) driven by a `ModeSpec`:
-per-shake or per-session clock, an optional word quota, an optional fixed shake count,
-`escalating` for Progressive Speed, `locked` for the Senior Simulation. Adding a mode is
-adding a spec, not a new code path.
-
-Player choices live in `SessionConfig` — allowed parts of speech, cube pool, seconds, quota,
-demand pressure, a pinned demand — and are serialised into the drill URL, so every mode gets
-the same options for free and any drill can be linked, replayed or handed to a teammate.
-
-## Performance
-
-The lexicon is stored as one packed `Uint8Array` of 26-slot letter counts. `canSpell` reads
-that array at an offset instead of copying, and the solver walks a cached per-part-of-speech
-index. A full re-solve of the tagged lexicon is a few milliseconds, so an answer key can be
-recomputed on demand rather than cached and invalidated.
+Personal bests for word counts are kept per clock length, because 12 words in 30 seconds and
+12 in 120 seconds are not the same achievement.
 
 ## Rule changes
 
-`data/senior-2026.ts` is versioned data. When AGLOA revises the rules, copy it to
-`senior-2027.ts`, edit, and point the app at it. Engine code reads limits, timings,
-demand definitions, patterns and the scoring chart out of the ruleset — nothing is
-hard-coded, and the drill options are built from it too, so the parts of speech and demands
-a player can pick can never drift from what the engine enforces.
-
-## Club features — the seams, not the feature
-
-Deliberately **not** built yet, but the joins are in place:
-
-- `persistence/store.ts` is an interface (`load` / `save` / `clear`) with a `Profile`, so a
-  remote store drops in without touching the UI.
-- `ShakeLog` and `SessionLog` are flat, serialisable rows — already the shape
-  a leaderboard or club table would want.
-- Every shake is reproducible from `(seed, ruleset, cubeSet)`, so a weekly challenge or a
-  head-to-head is a shared seed, not a shared payload.
-- `generateAtLevel` is deterministic, so two players given the same seed get the same shakes.
+`data/senior-2026.ts` is versioned data. Copy it, edit it, point the app at the new file.
+The engine reads the letter range and the parts of speech from it; nothing is hard-coded,
+and the setup screen builds its chips from the same list, so what a player can pick cannot
+drift from what the engine enforces.
 
 ## Testing
 
-`npm test` runs 96 tests: letter pools with wilds and transfers, word and demand validation,
-demand-stack legality, generator invariants over hundreds of seeds, the session state
-machine, the drill options, scoring, statistics, records and persistence. Two suites are
-regression tests against official material — the worked shake from AGLOA's own step-by-step
-guide ("Summer brings sunburn."), and the complete scoring chart.
+`npm test` covers rolling (determinism, every cube on a face it has, published colour
+counts), grading (letter multisets, part of speech, the 4–10 range, duplicates, contractions,
+untagged spellings), the answer key (agrees with the grader, ordered, deduplicated, grows
+with more parts of speech), the drill state machine, results arithmetic, personal bests, the
+statistics, and persistence including recovery from corrupt storage.

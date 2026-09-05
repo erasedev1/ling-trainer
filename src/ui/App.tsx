@@ -6,7 +6,7 @@ import { Stats } from './pages/Stats';
 import { Settings } from './pages/Settings';
 
 const NAV = [
-  { path: '/', label: 'Modes' },
+  { path: '/', label: 'Roll' },
   { path: '/stats', label: 'Statistics' },
   { path: '/settings', label: 'Settings' },
 ];
@@ -37,7 +37,7 @@ function Shell() {
         </button>
         {inDrill ? (
           <button className="navlink" onClick={() => navigate('/')}>
-            ← Leave drill
+            ← Back
           </button>
         ) : (
           NAV.map((item) => (

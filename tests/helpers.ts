@@ -4,7 +4,7 @@ import { Lexicon } from '../src/engine/lexicon/lexicon';
 import type { LexiconPayload } from '../src/engine/lexicon/types';
 import { SENIOR_2026 } from '../data/senior-2026';
 import { APPROXIMATE_2026 } from '../data/cube-sets';
-import type { Demand, PartOfSpeech, RolledCube, ShakeState } from '../src/engine/types';
+import type { Cube, CubeSet } from '../src/engine/types';
 
 let cached: Lexicon | undefined;
 
@@ -19,32 +19,29 @@ export function lexicon(): Lexicon {
 export const ruleset = SENIOR_2026;
 export const cubeSet = APPROXIMATE_2026;
 
-let cubeCounter = 0;
-export function cubes(letters: string, color: RolledCube['color'] = 'red'): RolledCube[] {
-  return letters.split('').map((letter) => ({ cubeId: `t${cubeCounter++}`, color, letter: letter.toUpperCase() }));
-}
+export const deps = () => ({
+  cubeSet,
+  lexicon: lexicon(),
+  minLetters: ruleset.word.minLetters,
+  maxLetters: ruleset.word.maxLetters,
+});
 
-export function typeDemand(pos: PartOfSpeech): Demand {
-  return { defId: 'demand.type', label: pos, scope: 'word', category: 'type', cite: 'LT 9', params: { pos } };
-}
-
-export function functionDemand(functionId: string, label = functionId): Demand {
-  return { defId: 'demand.function', label, scope: 'sentence', category: 'function', cite: 'LT 10', params: { functionId } };
-}
-
-export function generalDemand(defId: string, params?: Record<string, string | number>): Demand {
-  const def = SENIOR_2026.generalDemands.find((d) => d.id === defId);
-  if (!def) throw new Error(`no such demand: ${defId}`);
-  return { defId: def.id, label: def.label, scope: def.scope, category: def.category, cite: def.cite, params };
-}
-
-export function shake(partial: Partial<ShakeState> & { letters: RolledCube[]; demands: Demand[] }): ShakeState {
+/**
+ * A cube set whose every face is the same letter, so a test can pin exactly
+ * which letters a roll produces regardless of the RNG.
+ */
+export function fixedCubeSet(letters: string): CubeSet {
+  const cubes: Cube[] = letters.split('').map((letter, i) => ({
+    id: `fixed-${i}`,
+    color: 'red',
+    faces: [letter, letter, letter, letter, letter, letter].map((l) => l.toUpperCase()),
+  }));
   return {
-    seed: 1,
-    resources: [],
-    demandCubes: [],
-    resourceAllowance: 1,
-    solveContext: 'challenge-now',
-    ...partial,
+    id: 'fixed',
+    label: 'Fixed test set',
+    provenance: 'custom',
+    note: 'test fixture',
+    demandColors: ['black', 'green'],
+    cubes,
   };
 }

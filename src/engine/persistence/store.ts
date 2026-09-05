@@ -1,45 +1,40 @@
-import type { CubeSet } from '../types';
-import type { RecordBook } from '../stats/records';
-import type { SessionLog, ShakeLog } from '../stats/stats';
+import type { CubeSet, PartOfSpeech } from '../types';
+import { EMPTY_RECORDS, type RecordBook } from '../stats/records';
+import type { RollLog } from '../stats/stats';
 
 /**
  * Local persistence.
  *
- * Deliberately behind an interface with a namespaced key: when club accounts
- * arrive, a remote store implements the same shape and the UI does not change.
- * Everything is keyed by a profile id so one device can hold several players.
+ * Behind an interface so a club account can swap in a remote store later
+ * without the UI changing. Everything lives in this browser; nothing is
+ * uploaded.
  */
-export interface Profile {
-  id: string;
-  name: string;
-  createdAt: number;
-}
-
 export interface Settings {
-  /** Cube set id, or 'custom'. */
   cubeSetId: string;
   customCubeSet?: CubeSet;
-  /** How many missed words a results screen lists before it truncates. */
-  showAnswerKeyLimit: number;
+  /** The drill setup to open with — what the player last used. */
+  types: PartOfSpeech[];
+  seconds: number;
+  /** How many missed words the results screen lists. */
+  showMissedLimit: number;
 }
 
 export interface StoredData {
-  version: 1;
-  profile: Profile;
+  version: 2;
   settings: Settings;
-  shakes: ShakeLog[];
-  sessions: SessionLog[];
+  rolls: RollLog[];
   records: RecordBook;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   cubeSetId: 'approximate-2026',
-  showAnswerKeyLimit: 40,
+  types: ['noun'],
+  seconds: 60,
+  showMissedLimit: 60,
 };
 
-const KEY = 'ling-trainer:v1';
-const MAX_SHAKES = 4000;
-const MAX_SESSIONS = 400;
+const KEY = 'ling-trainer:v2';
+const MAX_ROLLS = 3000;
 
 export interface Store {
   load(): StoredData;
@@ -48,14 +43,7 @@ export interface Store {
 }
 
 function freshData(): StoredData {
-  return {
-    version: 1,
-    profile: { id: 'local', name: 'Player', createdAt: Date.now() },
-    settings: { ...DEFAULT_SETTINGS },
-    shakes: [],
-    sessions: [],
-    records: {},
-  };
+  return { version: 2, settings: { ...DEFAULT_SETTINGS }, rolls: [], records: EMPTY_RECORDS };
 }
 
 export function createLocalStore(storage: Storage | undefined = globalThis.localStorage): Store {
@@ -66,30 +54,29 @@ export function createLocalStore(storage: Storage | undefined = globalThis.local
         const raw = storage.getItem(KEY);
         if (!raw) return freshData();
         const parsed = JSON.parse(raw) as StoredData;
-        if (parsed.version !== 1) return freshData();
-        return { ...freshData(), ...parsed, settings: { ...DEFAULT_SETTINGS, ...parsed.settings } };
+        if (parsed.version !== 2) return freshData();
+        return {
+          ...freshData(),
+          ...parsed,
+          settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
+          records: { ...EMPTY_RECORDS, ...parsed.records, mostWords: { ...parsed.records?.mostWords } },
+        };
       } catch {
         return freshData();
       }
     },
     save(data) {
       if (!storage) return;
-      const trimmed: StoredData = {
-        ...data,
-        shakes: data.shakes.slice(-MAX_SHAKES),
-        sessions: data.sessions.slice(-MAX_SESSIONS),
-      };
+      const trimmed: StoredData = { ...data, rolls: data.rolls.slice(-MAX_ROLLS) };
       try {
         storage.setItem(KEY, JSON.stringify(trimmed));
       } catch {
-        // Quota exceeded: drop the oldest half of the shake log and retry once.
+        // Quota exceeded: keep the most recent half and try once more. Training
+        // must never be blocked by storage.
         try {
-          storage.setItem(
-            KEY,
-            JSON.stringify({ ...trimmed, shakes: trimmed.shakes.slice(-Math.floor(MAX_SHAKES / 2)) }),
-          );
+          storage.setItem(KEY, JSON.stringify({ ...trimmed, rolls: trimmed.rolls.slice(-Math.floor(MAX_ROLLS / 4)) }));
         } catch {
-          /* give up silently: training must never be blocked by storage */
+          /* give up silently */
         }
       }
     },

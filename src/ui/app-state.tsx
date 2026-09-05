@@ -4,7 +4,7 @@ import { SENIOR_2026, type Ruleset } from '../../data/senior-2026';
 import { APPROXIMATE_2026, CUBE_SETS } from '../../data/cube-sets';
 import type { CubeSet } from '../engine/types';
 import { createLocalStore, type Settings, type StoredData } from '../engine/persistence/store';
-import type { SessionLog, ShakeLog } from '../engine/stats/stats';
+import type { RollLog } from '../engine/stats/stats';
 import type { RecordBook } from '../engine/stats/records';
 
 interface AppValue {
@@ -14,9 +14,7 @@ interface AppValue {
   lexiconError: string | undefined;
   data: StoredData;
   updateSettings(patch: Partial<Settings>): void;
-  /** Append finished shakes as they happen, so nothing is lost if the player walks away. */
-  recordShakes(shakes: ShakeLog[]): void;
-  recordSession(session: SessionLog, records: RecordBook): void;
+  recordRoll(log: RollLog, records: RecordBook): void;
   clearAll(): void;
 }
 
@@ -28,7 +26,7 @@ export function useApp(): AppValue {
   return value;
 }
 
-/** The lexicon is a ~5 MB asset; it is fetched once and shared by every drill. */
+/** The lexicon is a large asset; it is fetched once and shared by every drill. */
 export function AppProvider({ children }: { children: ReactNode }) {
   const store = useMemo(() => createLocalStore(), []);
   const [data, setData] = useState<StoredData>(() => store.load());
@@ -37,11 +35,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    const url = `${import.meta.env.BASE_URL}data/lexicon.json`;
-    Lexicon.load(url)
-      .then((lex) => {
-        if (!cancelled) setLexicon(lex);
-      })
+    Lexicon.load(`${import.meta.env.BASE_URL}data/lexicon.json`)
+      .then((lex) => !cancelled && setLexicon(lex))
       .catch((error: unknown) => {
         if (!cancelled) setLexiconError(error instanceof Error ? error.message : String(error));
       });
@@ -50,9 +45,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Writes are applied against the latest snapshot, not the one captured by the
-  // render that scheduled them: a drill can record shakes and then the session
-  // summary within a single tick, and the second write must not clobber the first.
+  // Writes apply against the latest snapshot, not the one captured by the render
+  // that scheduled them, so two writes in a tick cannot clobber each other.
   const latest = useRef(data);
   latest.current = data;
   const persist = useCallback(
@@ -77,12 +71,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateSettings(patch) {
       persist((previous) => ({ ...previous, settings: { ...previous.settings, ...patch } }));
     },
-    recordShakes(shakes) {
-      if (!shakes.length) return;
-      persist((previous) => ({ ...previous, shakes: [...previous.shakes, ...shakes] }));
-    },
-    recordSession(session, records) {
-      persist((previous) => ({ ...previous, sessions: [...previous.sessions, session], records }));
+    recordRoll(log, records) {
+      persist((previous) => ({ ...previous, rolls: [...previous.rolls, log], records }));
     },
     clearAll() {
       store.clear();

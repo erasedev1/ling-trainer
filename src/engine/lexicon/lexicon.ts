@@ -102,6 +102,14 @@ export class Lexicon {
     return arr;
   }
 
+  /** Every part of speech the lexicon has tagged entries for. */
+  allPartsOfSpeech(): PartOfSpeech[] {
+    const all: PartOfSpeech[] = [
+      'noun', 'pronoun', 'verb', 'adjective', 'adverb', 'preposition', 'conjunction', 'interjection',
+    ];
+    return all.filter((pos) => this.indicesForPos(pos).length > 0);
+  }
+
   private commonIndex = new Map<number, Int32Array>();
 
   /** Entry indices whose frequency tier is at most `maxTier`, cached. */

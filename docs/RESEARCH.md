@@ -298,20 +298,11 @@ type can satisfy them given a suitable sentence:
 - adjective/adverb **degree**, because `more common` makes `common` comparative
   (Handbook self-test #44) — so degree cannot be read off the word's shape
 
-**Consequence:** a drill that types free-form words can only honestly grade §3.1. The
-trainer therefore separates two kinds of content, and labels them in the UI:
-
-- **Shake drills** — generated, machine-graded, using only §3.1 constraints, with a
-  complete answer key. This is the real bottleneck skill in a live shake: *given these
-  cubes and these demands, what legal words exist at all?*
-- **Judgement drills** — curated items with authoritative answers, for §3.2. The
-  Handbook's own Judge's Self-Test (55 questions with answers and explanations,
-  Section XVIII) plus the worked examples throughout Sections II–XIII are the source.
-  Nothing here is invented.
-
-A sentence-level demand is still **displayed** on a shake drill when it is part of the
-generated scenario, marked "sentence-level — not graded here", because reading a full
-demand stack quickly is itself a trained skill.
+**Consequence, and what this trainer became:** a drill where you type words can only
+honestly grade §3.1. The trainer therefore does exactly one thing — roll the cubes, let you
+choose which parts of speech count, and grade the words you type against the letters and
+those parts of speech. It does not display or pretend to judge a demand stack, a sentence
+designation, or a function demand, because it cannot grade them.
 
 ### 3.3 The dictionary problem
 

@@ -1,140 +1,126 @@
 import { useMemo } from 'react';
 import { useApp } from '../app-state';
 import { navigate } from '../router';
-import { Stat } from '../components/Timer';
-import { breakdowns, totals, weaknesses, type Bucket } from '../../engine/stats/stats';
-import { RECORD_DEFS } from '../../engine/stats/records';
-import { MODES } from '../../engine/modes/session';
-import { randomSeed } from '../../engine/shake/rng';
-import { drillFor } from '../weakness';
-import { TRAINING_SCORE_LABEL } from '../../engine/scoring/score';
+import { byType, totals, weakestType } from '../../engine/stats/stats';
 
 export function Stats() {
   const app = useApp();
-  const { shakes, sessions, records } = app.data;
+  const { rolls, records } = app.data;
 
-  const breaks = useMemo(
-    () => breakdowns(shakes, (id) => app.ruleset.generalDemands.find((d) => d.id === id)?.label ?? id),
-    [shakes, app.ruleset],
-  );
-  const weak = useMemo(() => weaknesses(breaks), [breaks]);
-  const t = useMemo(() => totals(shakes, sessions), [shakes, sessions]);
+  const t = useMemo(() => totals(rolls), [rolls]);
+  const types = useMemo(() => byType(rolls), [rolls]);
+  const weakest = useMemo(() => weakestType(types), [types]);
+  const fastest = useMemo(() => Math.max(0, ...types.map((t) => t.perMinute)), [types]);
 
-  if (!shakes.length) {
+  if (!rolls.length) {
     return (
       <div className="page page-narrow">
         <h1 style={{ fontSize: 26, marginBottom: 8 }}>No data yet</h1>
-        <p className="dim">Run a drill and this page starts answering the only question that matters: what next?</p>
-        <button className="btn btn-primary" onClick={() => navigate('/drill', { mode: 'shake-sprint', seed: randomSeed() })}>
-          Shake Sprint
+        <p className="dim">Do a few rolls and this page starts telling you what to practise.</p>
+        <button className="btn btn-primary" onClick={() => navigate('/')}>
+          Roll
         </button>
       </div>
     );
   }
 
   return (
-    <div className="page">
+    <div className="page page-narrow">
       <h1 style={{ fontSize: 26, marginBottom: 14 }}>Statistics</h1>
 
       <div className="statgrid" style={{ marginBottom: 18 }}>
-        <Stat label="sessions" value={t.sessions} />
-        <Stat label="shakes" value={t.shakes} />
-        <Stat label="submitted" value={t.submitted} />
-        <Stat label="valid" value={t.valid} />
-        <Stat label="accuracy" value={`${(t.accuracy * 100).toFixed(1)}%`} hint="valid ÷ (valid + invalid)" />
-        <Stat label="coverage" value={`${(t.coverage * 100).toFixed(0)}%`} hint="valid ÷ words that existed" />
+        <Stat label="rolls" value={t.rolls} />
+        <Stat label="words found" value={t.valid} />
+        <Stat label="wrong" value={t.invalid} />
+        <Stat label="accuracy" value={`${(t.accuracy * 100).toFixed(0)}%`} />
         <Stat label="words/min" value={t.wordsPerMinute.toFixed(1)} />
-        <Stat label="best response" value={t.fastestResponseMs != null ? `${(t.fastestResponseMs / 1000).toFixed(1)}s` : '—'} />
-        <Stat label="score" value={t.points} hint={TRAINING_SCORE_LABEL} />
       </div>
 
       <div className="card" style={{ marginBottom: 18 }}>
-        <div className="eyebrow" style={{ marginBottom: 8 }}>
-          what to practise next
+        <div className="row spread" style={{ marginBottom: 10 }}>
+          <span className="eyebrow">words found per minute</span>
+          <span className="tiny faint">rate · rolls</span>
         </div>
-        {weak.length === 0 ? (
-          <p className="dim" style={{ margin: 0 }}>
-            Nothing is clearly weak yet. Keep running drills — a category needs four shakes before it is worth
-            calling out, and the trainer will not invent a weakness to fill the space.
-          </p>
-        ) : (
-          <>
-            <p style={{ margin: '0 0 12px', fontSize: 17 }}>
-              Your weakest area is <b style={{ color: 'var(--warn)' }}>{weak[0].label}</b>. {weak[0].message}
-            </p>
-            <div className="row">
-              <button className="btn btn-primary" onClick={() => navigate(...drillFor(weak[0]))}>
-                Drill {weak[0].label}
-              </button>
-              {weak[1] && (
-                <button className="btn" onClick={() => navigate(...drillFor(weak[1]))}>
-                  Or {weak[1].label}
-                </button>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="split" style={{ marginBottom: 18 }}>
-        <BucketCard title="by type demand" buckets={breaks.byType} />
-        <BucketCard title="by difficulty" buckets={breaks.byLevel} />
-      </div>
-
-      <div className="split" style={{ marginBottom: 18 }}>
-        <BucketCard title="by general demand" buckets={breaks.byDemand} limit={12} />
-        <BucketCard title="by sentence designation" buckets={breaks.byDesignation} limit={12} />
+        {types.map((row) => (
+          <div key={row.type} className="bar">
+            <span style={{ textTransform: 'capitalize' }}>{row.type}</span>
+            <span className={`track${weakest?.type === row.type ? ' weak' : ''}`}>
+              <i style={{ width: `${fastest ? Math.round((row.perMinute / fastest) * 100) : 0}%` }} />
+            </span>
+            <span className="n">
+              {row.perMinute.toFixed(1)}
+              <span className="faint tiny"> ·{row.rolls}</span>
+            </span>
+          </div>
+        ))}
+        <p className="small dim" style={{ margin: '12px 0 0' }}>
+          {weakest ? (
+            <>
+              Slowest so far: <b style={{ color: 'var(--warn)' }}>{weakest.type}</b> — {weakest.perMinute.toFixed(1)} a
+              minute, well behind your best.
+            </>
+          ) : (
+            'Nothing stands out yet. Two parts of speech need three rolls each before this will compare them.'
+          )}
+        </p>
       </div>
 
       <div className="card" style={{ marginBottom: 18 }}>
         <div className="eyebrow" style={{ marginBottom: 10 }}>
-          personal records
+          personal bests
         </div>
         <table className="data">
           <tbody>
-            {RECORD_DEFS.map((def) => {
-              const record = records[def.id];
-              return (
-                <tr key={def.id}>
-                  <td>{def.label}</td>
-                  <td className="num">
-                    {record ? `${record.value.toFixed(def.unit === '%' || def.unit === 's' ? 1 : 0)} ${def.unit}` : '—'}
-                  </td>
-                  <td className="num faint tiny">{record ? new Date(record.at).toLocaleDateString() : ''}</td>
+            {Object.entries(records.mostWords)
+              .sort((a, b) => Number(a[0]) - Number(b[0]))
+              .map(([seconds, record]) => (
+                <tr key={seconds}>
+                  <td>Most words in {seconds}s</td>
+                  <td className="num">{record!.value}</td>
+                  <td className="num faint tiny">{record!.types.join(' + ')}</td>
                 </tr>
-              );
-            })}
+              ))}
+            {records.bestWordsPerMinute && (
+              <tr>
+                <td>Best words per minute</td>
+                <td className="num">{records.bestWordsPerMinute.value.toFixed(1)}</td>
+                <td className="num faint tiny">{records.bestWordsPerMinute.types.join(' + ')}</td>
+              </tr>
+            )}
+            {records.bestAccuracy && (
+              <tr>
+                <td>Best accuracy</td>
+                <td className="num">{(records.bestAccuracy.value * 100).toFixed(0)}%</td>
+                <td className="num faint tiny">{records.bestAccuracy.types.join(' + ')}</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
       <div className="card">
         <div className="eyebrow" style={{ marginBottom: 10 }}>
-          recent sessions
+          recent rolls
         </div>
         <table className="data">
           <thead>
             <tr>
               <th>when</th>
-              <th>mode</th>
-              <th style={{ textAlign: 'right' }}>shakes</th>
-              <th style={{ textAlign: 'right' }}>valid</th>
+              <th>parts of speech</th>
+              <th style={{ textAlign: 'right' }}>found</th>
               <th style={{ textAlign: 'right' }}>accuracy</th>
-              <th style={{ textAlign: 'right' }}>score</th>
             </tr>
           </thead>
           <tbody>
-            {[...sessions]
+            {[...rolls]
               .reverse()
-              .slice(0, 15)
-              .map((session) => (
-                <tr key={session.id}>
-                  <td className="tiny dim">{new Date(session.at).toLocaleString()}</td>
-                  <td>{MODES[session.mode]?.name ?? session.mode}</td>
-                  <td className="num">{session.shakes}</td>
-                  <td className="num">{session.valid}</td>
-                  <td className="num">{(session.accuracy * 100).toFixed(0)}%</td>
-                  <td className="num">{session.points}</td>
+              .slice(0, 20)
+              .map((roll, i) => (
+                <tr key={`${roll.at}-${i}`}>
+                  <td className="tiny dim">{new Date(roll.at).toLocaleString()}</td>
+                  <td className="tiny">{roll.types.join(' + ') || 'any'}</td>
+                  <td className="num">{roll.valid}</td>
+                  <td className="num">{(roll.accuracy * 100).toFixed(0)}%</td>
                 </tr>
               ))}
           </tbody>
@@ -155,29 +141,11 @@ export function Stats() {
   );
 }
 
-function BucketCard({ title, buckets, limit = 8 }: { title: string; buckets: Bucket[]; limit?: number }) {
-  const rows = [...buckets].sort((a, b) => b.shakes - a.shakes).slice(0, limit);
-  if (!rows.length) return null;
+function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="card">
-      <div className="row spread" style={{ marginBottom: 10 }}>
-        <span className="eyebrow">{title}</span>
-        <span className="tiny faint">coverage · shakes</span>
-      </div>
-      {rows.map((bucket) => (
-        <div key={bucket.key} className="bar" title={`${Math.round(bucket.accuracy * 100)}% of submissions legal`}>
-          <span style={{ textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {bucket.label}
-          </span>
-          <span className={`track${bucket.coverage < 0.3 ? ' weak' : bucket.coverage < 0.6 ? ' mid' : ''}`}>
-            <i style={{ width: `${Math.round(bucket.coverage * 100)}%` }} />
-          </span>
-          <span className="n">
-            {Math.round(bucket.coverage * 100)}%
-            <span className="faint tiny"> ·{bucket.shakes}</span>
-          </span>
-        </div>
-      ))}
+    <div className="stat">
+      <div className="k">{label}</div>
+      <div className="v">{value}</div>
     </div>
   );
 }

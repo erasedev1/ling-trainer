@@ -600,52 +600,25 @@ table.data td.num {
   background: rgba(106, 169, 240, 0.06);
 }
 
-.modelist {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.setup {
+  max-width: 640px;
 }
 
-.modeblock {
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  background: var(--bg-raised);
-  overflow: hidden;
-}
-.modeblock-open {
-  border-color: var(--accent-dim);
+.btn-huge {
+  padding: 20px 46px;
+  font-size: 21px;
+  letter-spacing: 0.02em;
 }
 
-.modehead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  padding: 14px 16px;
-  text-align: left;
+/* 23 cubes want a tighter grid than a handful did. */
+.drill .cubes {
+  max-width: 720px;
+  gap: 6px;
 }
-.modehead:hover {
-  background: #171c22;
-}
-.modehead h3 {
-  font-size: 17px;
-}
-.modehead .tagline {
-  font-size: 13px;
-  color: var(--accent);
-  margin-top: 2px;
-}
-.modehead .chev {
-  font-family: var(--mono);
-  font-size: 20px;
-  color: var(--ink-faint);
-  line-height: 1;
-}
-
-.modebody {
-  padding: 4px 16px 18px;
-  border-top: 1px solid var(--line);
+.drill .cube {
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
 }
 
 .chips {
@@ -711,34 +684,6 @@ table.data td.num {
   max-width: 100%;
 }
 
-.modecard {
-  display: block;
-  text-align: left;
-  background: var(--bg-raised);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  padding: 16px;
-  transition: border-color 90ms linear;
-  width: 100%;
-}
-.modecard:hover {
-  border-color: var(--accent-dim);
-}
-.modecard h3 {
-  font-size: 17px;
-  margin-bottom: 3px;
-}
-.modecard p {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--ink-dim);
-  line-height: 1.45;
-}
-.modecard .tagline {
-  font-size: 13px;
-  color: var(--accent);
-}
-
 .seg {
   display: inline-flex;
   border: 1px solid var(--line-strong);
@@ -780,6 +725,18 @@ table.data td.num {
 @media (max-width: 620px) {
   .split {
     grid-template-columns: 1fr;
+  }
+  .drill .cube {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+    border-width: 1px;
+  }
+  .drill .cubes {
+    gap: 5px;
+  }
+  .btn-huge {
+    width: 100%;
   }
   .bar {
     grid-template-columns: 110px 1fr 48px;
